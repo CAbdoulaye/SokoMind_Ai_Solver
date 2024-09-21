@@ -12,7 +12,7 @@ def read_map(file_path):
 
 
 # Scan 2d array map and return obstacles x y coordinates
-def set_obstacles(map):
+def get_obstacles(map):
     obstacles = []
     x = y = 0
     for row in map:
@@ -26,22 +26,7 @@ def set_obstacles(map):
 
 
 # Scan 2d array map and return boxes x y coordinates
-def set_boxes(map):
-    boxes_count = []
-    boxes = {}
-    x = y = 0
-    for row in map:
-        x = 0
-        for element in row:
-            if element == 'X':
-                # boxes.append((("X" + str(len(boxes) + 1)), (x,y)))
-                boxes[("X" + str(len(boxes) + 1))] = [x, y]
-            x = x + 1
-        y = y - 1
-    return boxes
-
-#Test
-def set_boxes_test(map):
+def get_boxes(map):
     boxes_count = {}
     boxes = {}
     x = y = 0
@@ -60,15 +45,33 @@ def set_boxes_test(map):
                     boxes[(element + str(1))] = [x, y]
             x = x + 1
         y = y - 1
-    print("boxes_count")
-    print(boxes_count)
-    print("boxes")
-    print(boxes)
     return boxes
 
 
-# Scan 2d array map and return player x y coordinates
-def set_player(map):
+# Scan 2d array map and return storage x y coordinates
+def get_storage(map):
+    storage = {}
+    storage_count = {}
+    x = y = 0
+    for row in map:
+        x = 0
+        for element in row:
+            # S and lowercase letters represent storage units
+            if element == 'S' or element.islower():
+                if element in storage_count:
+                    storage_count[element] = storage_count[element] + 1
+                    temp = storage_count[element]
+                    storage[(element + str(temp))] = [x, y]
+                else:
+                    storage_count[element] = 1
+                    storage[(element + str(1))] = [x, y]
+            x = x + 1
+        y = y - 1
+    return storage
+
+
+# Scan 2d array map and return player/robot x y coordinates
+def get_player(map):
     x = y = 0
     for row in map:
         x = 0
@@ -80,19 +83,6 @@ def set_player(map):
         y = y - 1
     return False
 
-
-# Scan 2d array map and return storage x y coordinates
-def set_storage(map):
-    storage = {}
-    x = y = 0
-    for row in map:
-        x = 0
-        for element in row:
-            if element == 'S':
-                storage[("S" + str(len(storage) + 1))] = (x, y)
-            x = x + 1
-        y = y - 1
-    return storage
 
 def check_for_errors(player, boxes, storage):
     if player == False:
@@ -109,7 +99,7 @@ def check_for_errors(player, boxes, storage):
 # check for possible legal states
 # will change player coordinates and see if it is overlapping with anything
 # example p (1, -1) will become p (1, 0) -> up then p (1, -2) -> down then p (0, -1) -> left, ...
-# will return a list with the possible placements of player. ex ((0, -1), (1, -2) means player can only move left or down
+# will return a list with the possible placements of player
 def possible_movement(player, boxes):
     print("Initial Coordinates")
     print(player)
@@ -226,12 +216,12 @@ def check_for_box_overlap(box, boxes):
     # check if it's overlapping with another box
     return check_if_box_moved(box, boxes)
 
+
 sokomind_map = read_map("sokomind_maps/sokomind_map1_test.txt")
-obstacles = set_obstacles(sokomind_map)
-# boxes = set_boxes(sokomind_map)
-boxes = set_boxes_test(sokomind_map)
-player = set_player(sokomind_map)
-storage = set_storage(sokomind_map)
+obstacles = get_obstacles(sokomind_map)
+boxes = get_boxes(sokomind_map)
+player = get_player(sokomind_map)
+storage = get_storage(sokomind_map)
 check_for_errors(player, boxes, storage)
 legal_moves = possible_movement(player, boxes)
 
