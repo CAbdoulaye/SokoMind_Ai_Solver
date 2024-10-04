@@ -1,4 +1,6 @@
 import sys
+import copy
+from state import State
 
 
 # Scan the map from text file and return a 2d array
@@ -12,25 +14,26 @@ def read_map(file_path):
 
 
 # Scan 2d array map and return obstacles x y coordinates
-def get_obstacles(map):
-    obstacles = []
+def get_obstacles(my_map):
+    my_obstacles = []
     x = y = 0
-    for row in map:
+    for row in my_map:
         x = 0
         for element in row:
             if element == 'O':
-                obstacles.append((x, y))
+                my_obstacles.append((x, y))
             x = x + 1
         y = y - 1
-    return obstacles
+    return my_obstacles
 
 
 # Scan 2d array map and return boxes x y coordinates
-def get_boxes(map):
+def get_boxes(my_map):
     boxes_count = {}
-    boxes = {}
+    my_boxes = {}
+    my_boxes_sorted = {}
     x = y = 0
-    for row in map:
+    for row in my_map:
         x = 0
         for element in row:
             # If element = 0 (not an obstacle) or R (not a robot) or S (storage for box X) and is uppercase (is a
@@ -39,41 +42,50 @@ def get_boxes(map):
                 if element in boxes_count:
                     boxes_count[element] = boxes_count[element] + 1
                     temp = boxes_count[element]
-                    boxes[(element + str(temp))] = [x, y]
+                    my_boxes[(element + str(temp))] = [x, y]
+                    my_boxes_sorted[element][(element + str(temp))] = [x, y]
                 else:
                     boxes_count[element] = 1
-                    boxes[(element + str(1))] = [x, y]
+                    my_boxes[(element + str(1))] = [x, y]
+                    my_boxes_sorted[element] = {}
+                    my_boxes_sorted[element][(element + str(1))] = [x, y]
             x = x + 1
         y = y - 1
-    return boxes
+    return {"my_boxes": my_boxes, "my_boxes_sorted": my_boxes_sorted}
 
 
 # Scan 2d array map and return storage x y coordinates
-def get_storage(map):
-    storage = {}
+def get_storage(my_map):
+    my_storage = {}
     storage_count = {}
+    my_storage_sorted = {}
+
     x = y = 0
-    for row in map:
+    for row in my_map:
         x = 0
         for element in row:
             # S and lowercase letters represent storage units
             if element == 'S' or element.islower():
-                if element in storage_count:
+                if element not in storage_count:
+                    my_storage_sorted[element] = {}
+                    storage_count[element] = 1
+                    my_storage[(element + str(1))] = [x, y]
+                    my_storage_sorted[element][(element + str(1))] = [x, y]
+                else:
                     storage_count[element] = storage_count[element] + 1
                     temp = storage_count[element]
-                    storage[(element + str(temp))] = [x, y]
-                else:
-                    storage_count[element] = 1
-                    storage[(element + str(1))] = [x, y]
+                    my_storage[(element + str(temp))] = [x, y]
+                    my_storage_sorted[element][(element + str(temp))] = [x, y]
+
             x = x + 1
         y = y - 1
-    return storage
+    return {"my_storage": my_storage, "my_storage_sorted": my_storage_sorted}
 
 
 # Scan 2d array map and return player/robot x y coordinates
-def get_player(map):
+def get_player(my_map):
     x = y = 0
-    for row in map:
+    for row in my_map:
         x = 0
         for element in row:
             if element == 'R':
@@ -84,14 +96,15 @@ def get_player(map):
     return False
 
 
-def check_for_errors(player, boxes, storage):
-    if player == False:
+def check_for_errors(my_player, my_boxes, my_storage):
+    if my_player == False:
         print("Error: Player is missing from map")
         sys.exit(1)
-    if len(boxes) > len(storage):
+    if len(my_boxes) > len(my_storage):
         print("Error: Their are more boxes than storage units on map")
         sys.exit(1)
-    # must also check and make sure the sokomind is closed, if they is a gap our player may move to infinity. map must BE retricted
+    # must also check and make sure the sokomind is closed, if they is a gap our player may move to infinity.
+    # map must BE restricted
 
     print("Map Looks Good")
 
@@ -100,24 +113,22 @@ def check_for_errors(player, boxes, storage):
 # will change player coordinates and see if it is overlapping with anything
 # example p (1, -1) will become p (1, 0) -> up then p (1, -2) -> down then p (0, -1) -> left, ...
 # will return a list with the possible placements of player
-def possible_movement(player, boxes):
-    print("Initial Coordinates")
-    print(player)
+def possible_movement(my_player, my_boxes):
     # Move Left
-    move_left = check_for_obstacle_overlap((player[0] - 1, player[1]))
+    move_left = check_for_obstacle_overlap((my_player[0] - 1, my_player[1]))
     # Move Up
-    move_up = check_for_obstacle_overlap((player[0], player[1] + 1))
+    move_up = check_for_obstacle_overlap((my_player[0], my_player[1] + 1))
     # Move right
-    move_right = check_for_obstacle_overlap((player[0] + 1, player[1]))
+    move_right = check_for_obstacle_overlap((my_player[0] + 1, my_player[1]))
     # Move down
-    move_down = check_for_obstacle_overlap((player[0], player[1] - 1))
+    move_down = check_for_obstacle_overlap((my_player[0], my_player[1] - 1))
 
     # Dictionary with possible moves and the coordinates
     player_move = {
-        "left": { "coordinate": (player[0] - 1, player[1]), "legal": move_left},
-        "up": {"coordinate": (player[0], player[1] + 1), "legal": move_up},
-        "right": {"coordinate": (player[0] + 1, player[1]), "legal": move_right},
-        "down": {"coordinate": (player[0], player[1] - 1), "legal": move_down}
+        "left": {"coordinate": (my_player[0] - 1, my_player[1]), "legal": move_left},
+        "up": {"coordinate": (my_player[0], my_player[1] + 1), "legal": move_up},
+        "right": {"coordinate": (my_player[0] + 1, my_player[1]), "legal": move_right},
+        "down": {"coordinate": (my_player[0], my_player[1] - 1), "legal": move_down}
     }
 
     # check if a box was moved
@@ -126,20 +137,20 @@ def possible_movement(player, boxes):
         "left": False,
         "up": False,
         "down": False,
-        "right":False
+        "right": False
     }
     for key, value in player_move.items():
         # if move is legal
         if value["legal"]:
-            box_move[key] = check_if_box_moved(value, boxes)
+            box_move[key] = check_if_box_moved(value, my_boxes)
 
     # Check if the moved box is in a legal state
     # illegal state is where an obstacle or another box is
     box_coordinate = {
-        "left": {"coordinate": (player[0] - 2, player[1]), "legal": move_left},
-        "up": {"coordinate": (player[0], player[1] + 2), "legal": move_up},
-        "right": {"coordinate": (player[0] + 2, player[1]), "legal": move_right},
-        "down": {"coordinate": (player[0], player[1] - 2), "legal": move_down}
+        "left": {"coordinate": (my_player[0] - 2, my_player[1]), "legal": move_left},
+        "up": {"coordinate": (my_player[0], my_player[1] + 2), "legal": move_up},
+        "right": {"coordinate": (my_player[0] + 2, my_player[1]), "legal": move_right},
+        "down": {"coordinate": (my_player[0], my_player[1] - 2), "legal": move_down}
     }
     # Box is overlapped with another box after move
     box_overlap = {
@@ -161,19 +172,17 @@ def possible_movement(player, boxes):
         # If box moved after player movement
         if box_move[key]:
             # check if box is overlapped with another box
-            box_overlap[key] = check_for_box_overlap(value, boxes)
+            box_overlap[key] = check_for_box_overlap(value, my_boxes)
             # check if box is overlapped with obstacles
             box_obstacle_overlap[key] = not check_for_obstacle_overlap(box_coordinate[key]["coordinate"])
         # Else if player moved but box did not: there is no overlap
         elif value["legal"] and not box_move[key]:
             box_overlap[key] = False
 
-
     for key, value in player_move.items():
         # If the player move is legal but the box moved is illegal: move becomes illegal
         if value["legal"] and (box_overlap[key] or box_obstacle_overlap[key]):
             player_move[key]["legal"] = False
-
 
     keys_to_delete = []
     for key, value in player_move.items():
@@ -195,41 +204,106 @@ def possible_movement(player, boxes):
 
 # After every movement, this function checks if the player's position is overlapping with an obstacle
 # Returns True if position is legal and False if illegal
-def check_for_obstacle_overlap(player):
+def check_for_obstacle_overlap(my_player):
     for element in obstacles:
         # element[0] == player[0] means if the x coordinates are the same
-        if element[0] == player[0] and element[1] == player[1]:
+        if element[0] == my_player[0] and element[1] == my_player[1]:
             return False
     return True
 
 
-def check_if_box_moved(movement, boxes):
+def check_if_box_moved(movement, my_boxes):
     player_position = movement["coordinate"]
-    for element in boxes.values():
+    for element in my_boxes.values():
         if element[0] == player_position[0] and element[1] == player_position[1]:
             return True
     return False
 
 
-def check_for_box_overlap(box, boxes):
+def check_for_box_overlap(box, my_boxes):
 
     # check if it's overlapping with another box
-    return check_if_box_moved(box, boxes)
+    return check_if_box_moved(box, my_boxes)
 
 
+# Initial State
+def init_state(my_player, my_boxes):
+    s1 = State(my_player, my_boxes, None, None)
+    print("s1")
+    print(s1)
+    return s1
+
+
+def new_state(my_player, my_boxes, move, state):
+    # new state
+    nw_state = State(my_player, my_boxes, move, state)
+    print(nw_state)
+    return nw_state
+
+# Final state. all boxes must be in their respective storage units
+def final_state(my_boxes, my_storage):
+    for box in my_boxes:
+        print("box")
+        print(box)
+    for storage in my_storage:
+        print("storage")
+        print(storage)
+
+
+def successor(player_move, my_boxes, move_coordinates, old_move, old_state):
+    # legal state was already explored. This function makes the move and creates a new state
+    # move coordinates tells the new move values. for left move coordinates = (-1, 0)
+    # move coordinates will be added to the box if player is overlapping with box
+    # legal moves already checked if the move is legal. so if new position = a box position then
+    # box position must be changed and is legal
+    state_boxes = copy.deepcopy(my_boxes)
+    player_position = player_move["coordinate"]
+    for element in state_boxes.values():
+        if element[0] == player_position[0] and element[1] == player_position[1]:
+            element[0] = element[0] + move_coordinates[0]
+            element[1] = element[1] + move_coordinates[1]
+            break
+    nw_state = new_state(player_position, state_boxes, old_move, old_state)
+
+    return nw_state
+
+
+# Getting required data to run code eg. player position, ...
 sokomind_map = read_map("sokomind_maps/sokomind_map1_test.txt")
 obstacles = get_obstacles(sokomind_map)
-boxes = get_boxes(sokomind_map)
+
+all_boxes = get_boxes(sokomind_map)
+boxes = all_boxes["my_boxes"]
+sorted_boxes = all_boxes["my_boxes_sorted"]
+
+all_storage = get_storage(sokomind_map)
+storage = all_storage["my_storage"]
+sorted_storage = all_storage["my_storage_sorted"]
+
 player = get_player(sokomind_map)
-storage = get_storage(sokomind_map)
-check_for_errors(player, boxes, storage)
+
+current_state = init_state(player, boxes)
+player = current_state.get_player()
+boxes = current_state.get_boxes()
+
 legal_moves = possible_movement(player, boxes)
 
+moves = {
+        "left": (-1, 0),
+        "up": (0, 1),
+        "right": (1, 0),
+        "down": (0, -1)
+    }
 
-# develop a class that represents a state.
+for key, value in legal_moves.items():
+    print(key)
+    current_state = successor(legal_moves[key], boxes, moves[key], key, current_state)
 
-# print("Player position: " , player)
-# print("Boxes position: " , boxes)
-# print("storage position: " , storage)
-# print("obstacles position: " , obstacles)
+
+# final_state(sorted_boxes, storage)
+# player = get_player(sokomind_map)
+# check_for_errors(player, boxes, storage)
+# legal_moves = possible_movement(player, boxes)
+# init_state(player, boxes)
+
 
