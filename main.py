@@ -1,6 +1,9 @@
 import sys
 import copy
 from state import State
+from BFS_fringe import Fringe_BFS
+from DFS_fringe import Fringe_DFS
+from Close_list import Close_List
 
 
 # Scan the map from text file and return a 2d array
@@ -196,9 +199,6 @@ def possible_movement(my_player, my_boxes):
     for move in player_move:
         del player_move[move]["legal"]
 
-    print("legal moves:")
-    print(player_move)
-
     return player_move
 
 
@@ -229,25 +229,40 @@ def check_for_box_overlap(box, my_boxes):
 # Initial State
 def init_state(my_player, my_boxes):
     s1 = State(my_player, my_boxes, None, None)
-    print("s1")
-    print(s1)
     return s1
 
 
 def new_state(my_player, my_boxes, move, state):
     # new state
     nw_state = State(my_player, my_boxes, move, state)
-    print(nw_state)
     return nw_state
 
+
 # Final state. all boxes must be in their respective storage units
-def final_state(my_boxes, my_storage):
-    for box in my_boxes:
-        print("box")
-        print(box)
-    for storage in my_storage:
-        print("storage")
-        print(storage)
+def is_final_state(my_boxes, my_storage):
+    # print("boxes")
+    # print(my_boxes)
+    # for box in my_boxes:
+    #     print(box)
+    # print("storage")
+    # for storage in my_storage:
+    #     print(storage)
+    #     print(my_storage[storage])
+
+    for key, value in my_boxes.items():
+        # print(key)
+        # print(value)
+        if key[0] == 'X':
+            # print("Storage S")
+            # print(my_storage["S"])
+            if value not in my_storage["S"].values():
+                return False
+        else:
+            # print("Storage ", key[0].lower())
+            # print(my_storage[key[0].lower()])
+            if value not in my_storage[key[0].lower()].values():
+                return False
+        return True
 
 
 def successor(player_move, my_boxes, move_coordinates, old_move, old_state):
@@ -269,7 +284,7 @@ def successor(player_move, my_boxes, move_coordinates, old_move, old_state):
 
 
 # Getting required data to run code eg. player position, ...
-sokomind_map = read_map("sokomind_maps/sokomind_map1_test.txt")
+sokomind_map = read_map("sokomind_maps/sokomind_map5_test.txt")
 obstacles = get_obstacles(sokomind_map)
 
 all_boxes = get_boxes(sokomind_map)
@@ -283,10 +298,6 @@ sorted_storage = all_storage["my_storage_sorted"]
 player = get_player(sokomind_map)
 
 current_state = init_state(player, boxes)
-player = current_state.get_player()
-boxes = current_state.get_boxes()
-
-legal_moves = possible_movement(player, boxes)
 
 moves = {
         "left": (-1, 0),
@@ -295,10 +306,60 @@ moves = {
         "down": (0, -1)
     }
 
-for key, value in legal_moves.items():
-    print(key)
-    current_state = successor(legal_moves[key], boxes, moves[key], key, current_state)
+# for key, value in legal_moves.items():
+#     print(key)
+#     current_state = successor(legal_moves[key], boxes, moves[key], key, current_state)
 
+my_fringe = Fringe_DFS()
+my_fringe.add(current_state)
+my_closed_list = Close_List()
+
+count = 100000
+temp = 100000
+
+found_solution = False
+
+while not my_fringe.is_empty() and count != 0:
+    # remove head of fringe
+    current_state = my_fringe.remove()
+    print("Popped State")
+    print(current_state)
+    if not my_closed_list.is_in_closed_list(current_state):
+        my_closed_list.add(current_state)
+        current_state_move = current_state.get_previous_move()
+        # get player and boxes coordinates
+        player = current_state.get_player()
+        boxes = current_state.get_boxes()
+        if is_final_state(boxes, sorted_storage):
+            print("Puzzle Solved")
+            print(current_state)
+            found_solution = True
+            break
+
+        # get legal moves
+        legal_moves = possible_movement(player, boxes)
+        for key, value in legal_moves.items():
+            if current_state_move is not None:
+                my_old_move = current_state_move + " -> " + key
+            else:
+                my_old_move = key
+
+            state_to_add = successor(legal_moves[key], boxes, moves[key], my_old_move, current_state)
+            # if not my_closed_list.is_in_closed_list(state_to_add):
+            my_fringe.add(state_to_add)
+        count = count - 1
+
+    else:
+        print("is in closed list")
+my_fringe.print_elements()
+
+if found_solution:
+    print("Num of Tries")
+    print(temp - count)
+    print("Steps")
+    print(current_state.get_previous_move())
+
+#
 
 # final_state(sorted_boxes, storage)
 # player = get_player(sokomind_map)
