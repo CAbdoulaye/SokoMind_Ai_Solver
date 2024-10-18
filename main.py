@@ -1,9 +1,12 @@
 import sys
 import copy
 from state import State
+from manhattan_state import Manhattan_State
 from BFS_fringe import Fringe_BFS
 from DFS_fringe import Fringe_DFS
 from Close_list import Close_List
+from Manhattan_Heuristic_fringe import Fringe_Manhattan
+import random
 
 
 # Scan the map from text file and return a 2d array
@@ -229,12 +232,26 @@ def check_for_box_overlap(box, my_boxes):
 # Initial State
 def init_state(my_player, my_boxes):
     s1 = State(my_player, my_boxes, None, None)
+    print("Initial State")
+    print(s1)
+    return s1
+
+
+def init_manhattan_state(my_player, my_boxes):
+    s1 = Manhattan_State(my_player, my_boxes, None, None)
+    print("Initial State")
+    print(s1)
     return s1
 
 
 def new_state(my_player, my_boxes, move, state):
     # new state
     nw_state = State(my_player, my_boxes, move, state)
+    return nw_state
+
+def new_manhattan_state(my_player, my_boxes, move, state):
+    # new state
+    nw_state = Manhattan_State(my_player, my_boxes, move, state)
     return nw_state
 
 
@@ -262,7 +279,7 @@ def is_final_state(my_boxes, my_storage):
             # print(my_storage[key[0].lower()])
             if value not in my_storage[key[0].lower()].values():
                 return False
-        return True
+    return True
 
 
 def successor(player_move, my_boxes, move_coordinates, old_move, old_state):
@@ -275,16 +292,297 @@ def successor(player_move, my_boxes, move_coordinates, old_move, old_state):
     player_position = player_move["coordinate"]
     for element in state_boxes.values():
         if element[0] == player_position[0] and element[1] == player_position[1]:
+            global moved_box
+            moved_box = True
             element[0] = element[0] + move_coordinates[0]
             element[1] = element[1] + move_coordinates[1]
             break
-    nw_state = new_state(player_position, state_boxes, old_move, old_state)
+    # nw_state = new_state(player_position, state_boxes, old_move, old_state)
+    nw_state = new_manhattan_state(player_position, state_boxes, old_move, old_state)
+
 
     return nw_state
 
 
+def find_manhattan_heuristic_value(my_boxes):
+    manhattan = 0
+    for key, value in my_boxes.items():
+        closest_val = 1000
+        if key[0] == 'X':
+            for storage_value in sorted_storage["S"].values():
+                diff = abs(storage_value[0] - value[0]) + abs(storage_value[1] - value[1])
+                if diff < closest_val:
+                    closest_val = diff
+                    manhattan = manhattan + closest_val
+        else:
+            # print("Storage ", key[0].lower())
+            # print(my_storage[key[0].lower()])
+            for storage_value in sorted_storage[key[0].lower()].values():
+                diff = abs(storage_value[0] - value[0]) + abs(storage_value[1] - value[1])
+                if diff < closest_val:
+                    closest_val = diff
+                    manhattan = manhattan + closest_val
+    # print(manhattan)
+    return manhattan
+    # find and return the value or add it directly to the fringe
+
+
+def use_DFS(my_initial_player, my_initial_boxes):
+    print("DFS")
+    current_state = init_state(my_initial_player, my_initial_boxes)
+    print("Program Running: Looking for Solution ...")
+
+    my_fringe = Fringe_DFS()
+    my_fringe.add(current_state)
+    my_closed_list = Close_List()
+
+    count = 100000
+    temp = count
+
+    found_solution = False
+    moved_box = True
+
+    while not my_fringe.is_empty() and count != 0:
+        # remove head of fringe
+        current_state = my_fringe.remove()
+        if not my_closed_list.is_in_closed_list(current_state):
+            # print("current_state")
+            # print(current_state)
+            # print("my_fringe")
+            # my_fringe.print_elements()
+            my_closed_list.add(current_state)
+            current_state_move = current_state.get_previous_move()
+            # get player and boxes coordinates
+            my_player = current_state.get_player()
+            my_boxes = current_state.get_boxes()
+            if is_final_state(boxes, sorted_storage):
+                print("Puzzle Solved")
+                print(current_state)
+                found_solution = True
+                break
+
+            # get legal moves
+            legal_moves = possible_movement(my_player, my_boxes)
+            # if last move was left and box did not move, delete right as it
+            # will be a waste of time to return to old state
+            if not moved_box:
+                if current_state_move.split()[-1] in legal_moves:
+                    move_to_delete = opposite_moves[current_state_move.split()[-1]]
+                    # print("current_state")
+                    # print(current_state)
+                    # print("legal_moves")
+                    # print(legal_moves)
+                    # print("move_to_delete")
+                    # print(move_to_delete)
+                    del legal_moves[move_to_delete]
+            # randomize the order to avoid having patterns
+            keys = list(legal_moves.keys())
+            random.shuffle(keys)
+            for item_key in keys:
+                if current_state_move is not None:
+                    my_old_move = current_state_move + " -> " + item_key
+                else:
+                    my_old_move = item_key
+                # print("last move")
+                # print(my_old_move.split()[-1])
+                # print("last move opposite")
+                # print(opposite_moves[my_old_move.split()[-1]])
+                state_to_add = successor(legal_moves[item_key], my_boxes, moves[item_key], my_old_move, current_state)
+
+                # if not my_closed_list.is_in_closed_list(state_to_add):
+                my_fringe.add(state_to_add)
+            count = count - 1
+        else:
+            # print("is in closed list")
+            pass
+        # print()
+
+        moved_box = False
+
+def use_Manhattan(my_initial_player, my_initial_boxes):
+    # current_state = init_state(player, boxes)
+    current_state = init_manhattan_state(my_initial_player, my_initial_boxes)
+    current_state.set_manhattan(find_manhattan_heuristic_value(my_initial_boxes))
+
+    print("Program Running: Looking for Solution ...")
+
+    # print("find_manhattan_heuristic_value")
+    # print(current_state.get_manhattan_heuristic_value())
+
+    my_fringe = Fringe_Manhattan()
+    my_fringe.add(current_state)
+    my_closed_list = Close_List()
+
+    count = 100000
+    temp = count
+
+    are_using_manhattan = True
+
+    found_solution = False
+    moved_box = True
+    while not my_fringe.is_empty() and count != 0:
+        # remove head of fringe
+        current_state = my_fringe.remove()
+        if not my_closed_list.is_in_closed_list(current_state):
+            # print("current_state")
+            # print(current_state)
+            # print("my_fringe")
+            # my_fringe.print_elements()
+            my_closed_list.add(current_state)
+            current_state_move = current_state.get_previous_move()
+            # get player and boxes coordinates
+            player = current_state.get_player()
+            boxes = current_state.get_boxes()
+            if is_final_state(boxes, sorted_storage):
+                print("Puzzle Solved")
+                print(current_state)
+                found_solution = True
+                break
+
+            # get legal moves
+            legal_moves = possible_movement(player, boxes)
+            # if last move was left and box did not move, delete right as it
+            # will be a waste of time to return to old state
+            if not moved_box:
+                if current_state_move.split()[-1] in legal_moves:
+                    move_to_delete = opposite_moves[current_state_move.split()[-1]]
+                    # print("current_state")
+                    # print(current_state)
+                    # print("legal_moves")
+                    # print(legal_moves)
+                    # print("move_to_delete")
+                    # print(move_to_delete)
+                    del legal_moves[move_to_delete]
+            # randomize the order to avoid having patterns
+            keys = list(legal_moves.keys())
+            random.shuffle(keys)
+            for item_key in keys:
+                if current_state_move is not None:
+                    my_old_move = current_state_move + " -> " + item_key
+                else:
+                    my_old_move = item_key
+                # print("last move")
+                # print(my_old_move.split()[-1])
+                # print("last move opposite")
+                # print(opposite_moves[my_old_move.split()[-1]])
+                state_to_add = successor(legal_moves[item_key], boxes, moves[item_key], my_old_move, current_state)
+
+                if are_using_manhattan:
+                    manhattan_boxes = state_to_add.get_boxes()
+                    state_to_add.set_manhattan(find_manhattan_heuristic_value(manhattan_boxes))
+                # if not my_closed_list.is_in_closed_list(state_to_add):
+                my_fringe.add(state_to_add)
+            count = count - 1
+        else:
+            pass
+            # print("is in closed list")
+        # print()
+
+        moved_box = False
+
+    # my_fringe.print_elements()
+
+    if found_solution:
+        print("Num of Popped States")
+        print(temp - count)
+        print("Steps")
+        print(current_state.get_previous_move())
+        steps_count = current_state.get_previous_move().count("->") + 1
+        print("Num of Steps to find solution")
+        print(steps_count)
+    else:
+        print("Time ran out or no solution found")
+    #
+
+
+def use_BFS(my_initial_player, my_initial_boxes):
+    print("BFS")
+    current_state = init_state(my_initial_player, my_initial_boxes)
+    print("Program Running: Looking for Solution ...")
+
+    my_fringe = Fringe_BFS()
+    my_fringe.add(current_state)
+    my_closed_list = Close_List()
+
+    count = 100000
+    temp = count
+
+    found_solution = False
+    moved_box = True
+
+    while not my_fringe.is_empty() and count != 0:
+        # remove head of fringe
+        current_state = my_fringe.remove()
+        if not my_closed_list.is_in_closed_list(current_state):
+            # print("current_state")
+            # print(current_state)
+            # print("my_fringe")
+            # my_fringe.print_elements()
+            my_closed_list.add(current_state)
+            current_state_move = current_state.get_previous_move()
+            # get player and boxes coordinates
+            my_player = current_state.get_player()
+            my_boxes = current_state.get_boxes()
+            if is_final_state(boxes, sorted_storage):
+                print("Puzzle Solved")
+                print(current_state)
+                found_solution = True
+                break
+
+            # get legal moves
+            legal_moves = possible_movement(my_player, my_boxes)
+            # if last move was left and box did not move, delete right as it
+            # will be a waste of time to return to old state
+            if not moved_box:
+                if current_state_move.split()[-1] in legal_moves:
+                    move_to_delete = opposite_moves[current_state_move.split()[-1]]
+                    # print("current_state")
+                    # print(current_state)
+                    # print("legal_moves")
+                    # print(legal_moves)
+                    # print("move_to_delete")
+                    # print(move_to_delete)
+                    del legal_moves[move_to_delete]
+            # randomize the order to avoid having patterns
+            keys = list(legal_moves.keys())
+            random.shuffle(keys)
+            for item_key in keys:
+                if current_state_move is not None:
+                    my_old_move = current_state_move + " -> " + item_key
+                else:
+                    my_old_move = item_key
+                # print("last move")
+                # print(my_old_move.split()[-1])
+                # print("last move opposite")
+                # print(opposite_moves[my_old_move.split()[-1]])
+                state_to_add = successor(legal_moves[item_key], my_boxes, moves[item_key], my_old_move, current_state)
+
+                # if not my_closed_list.is_in_closed_list(state_to_add):
+                my_fringe.add(state_to_add)
+            count = count - 1
+        else:
+            # print("is in closed list")
+            pass
+        # print()
+
+        moved_box = False
+
+    # my_fringe.print_elements()
+    if found_solution:
+        print("Num of Popped States")
+        print(temp - count)
+        print("Steps")
+        print(current_state.get_previous_move())
+        steps_count = current_state.get_previous_move().count("->") + 1
+        print("Num of Steps to find solution")
+        print(steps_count)
+    else:
+        print("Time ran out or no solution found")
+
+
 # Getting required data to run code eg. player position, ...
-sokomind_map = read_map("sokomind_maps/sokomind_map5_test.txt")
+map = ("sokomind_maps/tiny_map.txt")
+sokomind_map = read_map(map)
 obstacles = get_obstacles(sokomind_map)
 
 all_boxes = get_boxes(sokomind_map)
@@ -297,8 +595,6 @@ sorted_storage = all_storage["my_storage_sorted"]
 
 player = get_player(sokomind_map)
 
-current_state = init_state(player, boxes)
-
 moves = {
         "left": (-1, 0),
         "up": (0, 1),
@@ -306,60 +602,130 @@ moves = {
         "down": (0, -1)
     }
 
-# for key, value in legal_moves.items():
-#     print(key)
-#     current_state = successor(legal_moves[key], boxes, moves[key], key, current_state)
+opposite_moves = {
+    "left": "right",
+    "up": "down",
+    "right": "left",
+    "down": "up"
+}
 
-my_fringe = Fringe_DFS()
-my_fringe.add(current_state)
-my_closed_list = Close_List()
-
-count = 100000
-temp = 100000
-
-found_solution = False
-
-while not my_fringe.is_empty() and count != 0:
-    # remove head of fringe
-    current_state = my_fringe.remove()
-    print("Popped State")
-    print(current_state)
-    if not my_closed_list.is_in_closed_list(current_state):
-        my_closed_list.add(current_state)
-        current_state_move = current_state.get_previous_move()
-        # get player and boxes coordinates
-        player = current_state.get_player()
-        boxes = current_state.get_boxes()
-        if is_final_state(boxes, sorted_storage):
-            print("Puzzle Solved")
-            print(current_state)
-            found_solution = True
-            break
-
-        # get legal moves
-        legal_moves = possible_movement(player, boxes)
-        for key, value in legal_moves.items():
-            if current_state_move is not None:
-                my_old_move = current_state_move + " -> " + key
-            else:
-                my_old_move = key
-
-            state_to_add = successor(legal_moves[key], boxes, moves[key], my_old_move, current_state)
-            # if not my_closed_list.is_in_closed_list(state_to_add):
-            my_fringe.add(state_to_add)
-        count = count - 1
-
-    else:
-        print("is in closed list")
-my_fringe.print_elements()
-
-if found_solution:
-    print("Num of Tries")
-    print(temp - count)
-    print("Steps")
-    print(current_state.get_previous_move())
-
+# # current_state = init_state(player, boxes)
+# current_state = init_manhattan_state(player, boxes)
+# current_state.set_manhattan(find_manhattan_heuristic_value(boxes))
 #
+# print("Program Running: Looking for Solution ...")
+#
+# # print("find_manhattan_heuristic_value")
+# # print(current_state.get_manhattan_heuristic_value())
+#
+#
+# my_fringe = Fringe_Manhattan()
+# my_fringe.add(current_state)
+# my_closed_list = Close_List()
+#
+# count = 100000
+# temp = count
+#
+# are_using_manhattan = True
+#
+# found_solution = False
+# moved_box = True
+# while not my_fringe.is_empty() and count != 0:
+#     # remove head of fringe
+#     current_state = my_fringe.remove()
+#     if not my_closed_list.is_in_closed_list(current_state):
+#         # print("current_state")
+#         # print(current_state)
+#         # print("my_fringe")
+#         # my_fringe.print_elements()
+#         my_closed_list.add(current_state)
+#         current_state_move = current_state.get_previous_move()
+#         # get player and boxes coordinates
+#         player = current_state.get_player()
+#         boxes = current_state.get_boxes()
+#         if is_final_state(boxes, sorted_storage):
+#             print("Puzzle Solved")
+#             print(current_state)
+#             found_solution = True
+#             break
+#
+#         # get legal moves
+#         legal_moves = possible_movement(player, boxes)
+#         # if last move was left and box did not move, delete right as it
+#         # will be a waste of time to return to old state
+#         if not moved_box:
+#             if current_state_move.split()[-1] in legal_moves:
+#                 move_to_delete = opposite_moves[current_state_move.split()[-1]]
+#                 # print("current_state")
+#                 # print(current_state)
+#                 # print("legal_moves")
+#                 # print(legal_moves)
+#                 # print("move_to_delete")
+#                 # print(move_to_delete)
+#                 del legal_moves[move_to_delete]
+#         # randomize the order to avoid having patterns
+#         keys = list(legal_moves.keys())
+#         random.shuffle(keys)
+#         for item_key in keys:
+#             if current_state_move is not None:
+#                 my_old_move = current_state_move + " -> " + item_key
+#             else:
+#                 my_old_move = item_key
+#             # print("last move")
+#             # print(my_old_move.split()[-1])
+#             # print("last move opposite")
+#             # print(opposite_moves[my_old_move.split()[-1]])
+#             state_to_add = successor(legal_moves[item_key], boxes, moves[item_key], my_old_move, current_state)
+#
+#             if are_using_manhattan:
+#                 manhattan_boxes = state_to_add.get_boxes()
+#                 state_to_add.set_manhattan(find_manhattan_heuristic_value(manhattan_boxes))
+#             # if not my_closed_list.is_in_closed_list(state_to_add):
+#             my_fringe.add(state_to_add)
+#         count = count - 1
+#     else:
+#         pass
+#         # print("is in closed list")
+#     # print()
+#
+#     moved_box = False
+#
+# # my_fringe.print_elements()
+#
+# if found_solution:
+#     print("Num of Popped States")
+#     print(temp - count)
+#     print("Steps")
+#     print(current_state.get_previous_move())
+#     steps_count = current_state.get_previous_move().count("->") + 1
+#     print("Num of Steps to find solution")
+#     print(steps_count)
+# else:
+#     print("Time ran out or no solution found")
+# #
+
+
+print("Select the Search Technique the AI will use")
+print("1. BFS")
+print("2. DFS")
+print("3. Manhattan Heuristic")
+print("4. Nontrivial Heuristic")
+print("5. A*")
+user_input = int(input("Enter a number: "))
+
+if user_input == 1:
+    use_BFS(player, boxes)
+elif user_input == 2:
+    use_DFS(player, boxes)
+elif user_input == 3:
+    use_Manhattan(player, boxes)
+# elif user_input == 4:
+#     use_Nontrivial()
+# elif user_input == 5:
+#     use_A_star()
+else:
+    print("Wrong Input")
+
 
 # final_state(sorted_boxes, storage)
 # player = get_player(sokomind_map)
